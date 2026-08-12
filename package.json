@@ -1,0 +1,9 @@
+{
+  "name": "tiny-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiny — The 21st Century AI. Wondermayank's Groq-powered chat persona.",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
