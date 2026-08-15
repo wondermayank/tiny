@@ -1,54 +1,74 @@
-# Tiny — The 21st Century AI
+# ThunderStudy AI Assistant
 
-Wondermayank's Groq-powered chat persona. Static frontend + one Vercel serverless
-function that calls Groq's Llama 3.3 70B model, kept behind the API so your key
-never reaches the browser.
+A full companion app UI for ThunderStudy — sidebar-nav app in the style of your
+reference mockups, wired to Groq for chat, tools, and a daily quiz. Everything
+personal (profile, chats, saved items, settings) stays in the visitor's
+browser via `localStorage` — nothing is sent to a database.
 
-## How it works
-- `index.html` — chat UI. Character art swaps between `images/side.png`
-  (idle / thinking) and `images/front.png` (has just answered).
-- `api/chat.js` — serverless function. Receives the conversation, adds Tiny's
-  system prompt (bio + personality), calls Groq, returns the reply.
-- Rate limit: 10 messages per browser per day, tracked in `localStorage`
-  (resets at midnight, matches the existing Telegram "Tiny 2.0" bot's limit).
-  This is a client-side soft limit — fine for a personal/portfolio project,
-  not abuse-proof. See "Harden the rate limit" below if you want a real one.
+## Structure
+- `index.html` — the whole app (chat, history, bookmarks, tools, materials,
+  profile, settings) in one file. Character art on the right is your uploaded
+  render (`images/character.png`).
+- `api/chat.js` — Groq call for chat + the 3 Study Tools. Builds a system
+  prompt from the visitor's saved name/gender/tone/length settings.
+- `api/quiz.js` — Groq call that returns 5 fresh MCQs as JSON for the daily
+  quiz widget.
+
+## Features implemented
+- **Onboarding** — first visit asks name + gender, stored locally, used to
+  personalize tone (see "Gender-aware answers" below).
+- **Chat** — bubble UI, quick-action chips (Study Plan / Explain Topic / Ask
+  Doubt / Syllabus / Mock Test → opens your existing aimock app.html).
+- **Daily Quiz** — 5 Groq-generated MCQs, resets every day (all 7 days a
+  week, no separate weekly cap). Progress bar + save-to-bookmarks on finish.
+- **History** — past chat sessions saved locally, click to reopen.
+- **Bookmarks** — saved quiz results (extend this the same way to save full
+  mock tests from `app.html` if you wire that page to write to the same
+  `tsai_bookmarks` localStorage key).
+- **Study Tools** — Summarize Notes / Explain Simply / Doubt Solver, all
+  calling `/api/chat` with a canned prompt.
+- **Study Material** — links out to thunderstudy.indevs.in, the AI Mock Test
+  Maker, and the CBT dashboard.
+- **Profile** — edit name/gender any time.
+- **Settings** — tone (Friendly/Formal), answer length (Short/Balanced/
+  Detailed), dark mode, and a "clear my data" button.
+- **Stats bar** — streak, quizzes taken, accuracy, level — all computed
+  honestly from local data (no fake numbers).
+
+## Gender-aware answers
+Per your spec: if the profile is "girl" and she asks about periods, the
+system prompt tells the model to explain what's happening in the body,
+common symptoms, self-care do's and don'ts, and when to see a doctor — warm
+and factual, not clinical. If the profile is "boy", the model keeps the
+biology brief and spends more of the answer on how to be supportive
+(practical, respectful, non-awkward). This logic lives in
+`buildSystemPrompt()` in `api/chat.js` — edit the wording there any time.
 
 ## Deploy on Vercel
-
-1. **Get a Groq API key** — console.groq.com → API Keys → create one.
-2. **Push this folder to a GitHub repo** (or drag-and-drop deploy via the
-   Vercel dashboard).
-3. **Import the repo in Vercel** — vercel.com/new → select the repo.
-   No framework preset needed; Vercel auto-detects the static file +
-   `api/` function.
-4. **Add the environment variable**:
-   - Project → Settings → Environment Variables
-   - Key: `GROQ_API_KEY`
-   - Value: your Groq key
-   - Apply to Production, Preview, and Development
-5. **Deploy.** Vercel serves `index.html` and `images/` statically and
-   turns `api/chat.js` into `/api/chat`.
+1. Get a Groq key at console.groq.com → API Keys.
+2. Push this folder to GitHub, import into Vercel (no framework preset
+   needed — static file + `api/` functions are auto-detected).
+3. Project → Settings → Environment Variables → add `GROQ_API_KEY`.
+4. Deploy. You can point this at a subdomain like `assistant.thunderstudy.indevs.in`
+   or swap it in for the current `aimock.thunderstudy.indevs.in` experience.
 
 ### CLI alternative
 ```bash
 npm i -g vercel
 vercel login
-vercel          # first deploy, follow prompts
+vercel
 vercel env add GROQ_API_KEY production
 vercel --prod
 ```
 
-## Customize
-- **Bio / persona**: edit `SYSTEM_PROMPT` in `api/chat.js`.
-- **Colors**: CSS variables at the top of `index.html` (`--primary`, etc.) —
-  currently Thunder's indigo `#573AFC` (dark mode: `#9A7AFB`).
-- **Model**: change `model: 'llama-3.3-70b-versatile'` in `api/chat.js` to
-  any Groq-hosted model (e.g. a smaller one for even faster replies).
-
-## Harden the rate limit (optional)
-The current limit lives in the visitor's browser, so clearing storage or
-using another browser resets it. For a real per-visitor limit, add Vercel
-KV (or any small key-value store) in `api/chat.js`, key it off a hashed IP
-or a signed cookie, and reject requests server-side once the daily count is
-hit — the same pattern the "Tiny 2.0" Telegram bot uses with Cloudflare KV.
+## Known limits / next steps
+- Daily quiz and rate limits are client-side (localStorage) — fine for a
+  personal/student tool, not abuse-proof. For a hard server-side cap, add
+  Vercel KV keyed by IP or a signed cookie in `api/quiz.js` and `api/chat.js`.
+- "Save Mock Test" from the existing `app.html` doesn't yet write into this
+  app's Bookmarks — they're separate localStorage stores today since
+  `app.html` lives on a different origin/page. If you want them unified,
+  either merge this UI into `app.html` directly, or have `app.html` push a
+  `postMessage` / write to a shared key once both are on the same domain.
+- Character image is ~2MB — worth compressing to WebP for faster load,
+  same as noted for the Tiny build.

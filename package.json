@@ -1,8 +1,8 @@
 {
-  "name": "tiny-ai",
+  "name": "thunderstudy-ai-assistant",
   "version": "1.0.0",
   "private": true,
-  "description": "Tiny — The 21st Century AI. Wondermayank's Groq-powered chat persona.",
+  "description": "ThunderStudy AI Assistant — chat, daily quiz, saved mocks, study tools. Groq-powered.",
   "scripts": {
     "dev": "vercel dev"
   }
