@@ -44,6 +44,27 @@ biology brief and spends more of the answer on how to be supportive
 (practical, respectful, non-awkward). This logic lives in
 `buildSystemPrompt()` in `api/chat.js` — edit the wording there any time.
 
+## 3D character
+The character on the right side is a 3D model (`images/character.glb`), shown with Google's
+`<model-viewer>`. Everything is self-hosted (`vendor/model-viewer.min.js`, `vendor/draco/`), so it
+works without any CDN. It auto-rotates and can be dragged. To swap the character, replace
+`images/character.glb`. `images/character.png` is only the loading preview. The panel is hidden
+on screens under 900px wide, same as before.
+
+## AI models
+Pick a model from the chip above the chat box, or in Settings. Tiny is the default.
+
+| Name | Groq model |
+|---|---|
+| **Tiny** (Best, default) | `openai/gpt-oss-120b` |
+| Tiny Lite | `openai/gpt-oss-20b` |
+| Llama 3.3 70B | `llama-3.3-70b-versatile` |
+| Llama 3.1 8B | `llama-3.1-8b-instant` |
+
+The list and fallback logic live in `api/_groq.js`. If the chosen model is unavailable for your Groq
+key, the others are tried automatically (Tiny first) and the chat says which one answered. The
+daily quiz and Study Tools use the same selected model.
+
 ## Deploy on Vercel
 1. Get a Groq key at console.groq.com → API Keys.
 2. Push this folder to GitHub, import into Vercel (no framework preset

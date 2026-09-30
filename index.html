@@ -62,6 +62,8 @@
   .view-wrap { flex:1; overflow:hidden; display:grid; grid-template-columns:1fr 320px; }
   .view { overflow-y:auto; padding:24px; }
   .stage-col { border-left:1px solid var(--hairline); background:linear-gradient(180deg,var(--canvas-parchment),var(--surface-soft)); display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding:20px; }
+  .stage-model { width:100%; max-width:300px; height:min(52vh,430px); background:transparent; --poster-color:transparent; outline:none; cursor:grab; }
+  .stage-model:active { cursor:grabbing; }
   .stage-img { width:100%; max-width:230px; filter:drop-shadow(2px 6px 24px rgba(87,58,252,0.28)); }
   .stage-caption { text-align:center; padding:14px 4px 8px; }
   .stage-caption .q { font-size:12px; color:var(--muted); font-style:italic; line-height:1.5; }
@@ -160,6 +162,27 @@
   .onboard-submit { width:100%; background:var(--primary); color:var(--on-primary); border:none; border-radius:9999px; padding:13px; font-weight:700; font-size:14.5px; cursor:pointer; }
   .onboard-submit:disabled { opacity:.5; cursor:not-allowed; }
 
+
+  /* Model picker */
+  .model-chip { display:inline-flex; align-items:center; gap:7px; border-color:var(--primary); color:var(--primary); background:var(--bubble-bot); }
+  .model-chip .mdot { width:8px; height:8px; border-radius:50%; background:var(--primary); }
+  .model-chip svg { width:10px; height:10px; transition:transform .2s; }
+  .model-chip.open svg { transform:rotate(180deg); }
+  .model-menu { position:fixed; z-index:900; width:310px; max-width:92vw; padding:8px; background:var(--canvas); border:1px solid var(--hairline-strong); border-radius:16px; box-shadow:0 12px 40px rgba(87,58,252,.18); opacity:0; transform:translateY(6px) scale(.98); pointer-events:none; transition:opacity .16s, transform .16s; }
+  .model-menu.show { opacity:1; transform:none; pointer-events:auto; }
+  .model-menu-title { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:6px 10px 4px; }
+  .model-opt { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:12px; cursor:pointer; border:1.5px solid transparent; }
+  .model-opt:hover { background:var(--surface-soft); }
+  .model-opt.active { background:var(--bubble-bot); border-color:var(--primary); }
+  .model-opt .mo-icon { width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .model-opt .mo-icon svg { width:16px; height:16px; }
+  .model-opt .mo-text { flex:1; min-width:0; }
+  .model-opt .mo-name { font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px; }
+  .model-opt .mo-badge { font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:9999px; background:var(--primary); color:var(--on-primary); }
+  .model-opt .mo-desc { font-size:11.5px; color:var(--muted); margin-top:1px; line-height:1.35; }
+  .model-opt .mo-check { width:16px; height:16px; flex-shrink:0; opacity:0; color:var(--primary); }
+  .model-opt.active .mo-check { opacity:1; }
+  .bubble .model-note { display:block; margin-top:8px; padding-top:6px; border-top:1px dashed var(--hairline-strong); font-size:11.5px; color:var(--muted); }
   @media (max-width:900px) {
     .stage-col { display:none; }
     .view-wrap { grid-template-columns:1fr; }
@@ -171,6 +194,10 @@
     .stats-bar { display:none; }
   }
 </style>
+<script type="module">
+  import { ModelViewerElement } from '/vendor/model-viewer.min.js';
+  ModelViewerElement.dracoDecoderLocation = '/vendor/draco/';
+</script>
 </head>
 <body>
 
@@ -218,6 +245,10 @@
         </div>
         <div class="messages" id="messages"></div>
         <div class="chips" id="chips">
+          <button class="chip model-chip" id="modelChip" aria-haspopup="listbox" title="Choose AI model">
+            <span class="mdot"></span><span id="modelChipName">Tiny</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
           <button class="chip" data-fill="Can you make me a 7-day study plan for ">Study Plan</button>
           <button class="chip" data-fill="Explain this topic simply: ">Explain Topic</button>
           <button class="chip" data-fill="I have a doubt: ">Ask Doubt</button>
@@ -252,7 +283,7 @@
       <!-- TOOLS VIEW -->
       <div id="toolsView" class="view" style="display:none;">
         <h2 class="section-title">Study Tools</h2>
-        <p class="section-sub">Quick AI helpers, powered by Groq.</p>
+        <p class="section-sub">Quick AI helpers, powered by Groq. Uses the model you pick in Settings.</p>
         <div class="grid2" style="grid-template-columns:1fr;gap:16px;">
           <div class="card tool-card">
             <b>Summarize Notes</b>
@@ -334,6 +365,10 @@
             <div class="segmented" id="typeSeg"><button data-v="short">Short</button><button data-v="balanced">Balanced</button><button data-v="detailed">Detailed</button></div>
           </div>
           <div class="field-row">
+            <label>AI model<div class="hint">Tiny gives the best answers</div></label>
+            <div class="segmented" id="modelSeg" style="flex-wrap:wrap;justify-content:flex-end;"><button data-v="tiny">Tiny</button><button data-v="tiny-lite">Tiny Lite</button><button data-v="llama-70b">Llama 70B</button><button data-v="llama-8b">Llama 8B</button></div>
+          </div>
+          <div class="field-row">
             <label>Dark mode</label>
             <div class="segmented" id="themeSeg"><button data-v="light">Light</button><button data-v="dark">Dark</button></div>
           </div>
@@ -345,7 +380,13 @@
       </div>
 
       <aside class="stage-col">
-        <img src="/images/character.png" alt="ThunderStudy AI assistant" class="stage-img">
+        <model-viewer class="stage-model" src="/images/character.glb" poster="/images/character.png"
+          alt="ThunderStudy AI assistant — 3D character" loading="eager" reveal="auto"
+          camera-controls disable-zoom auto-rotate auto-rotate-delay="1500" rotation-per-second="18deg"
+          interaction-prompt="none" camera-orbit="0deg 82deg auto" field-of-view="28deg"
+          min-camera-orbit="auto 60deg auto" max-camera-orbit="auto 100deg auto"
+          shadow-intensity="1" shadow-softness="1" exposure="1.05" environment-image="neutral">
+        </model-viewer>
         <div class="stage-caption">
           <p class="q" id="stageQuote">"The expert in anything was once a beginner."</p>
         </div>
@@ -455,7 +496,15 @@
   });
 
   // ---------- settings ----------
-  let settings = LS.get('tsai_settings', { tone: 'friendly', type: 'balanced' });
+  const MODELS = [
+    { key:'tiny',      label:'Tiny',          badge:'Best', c1:'#573AFC', c2:'#A78BFA', desc:'Smartest answers. GPT OSS 120B, best for exams and tough topics.' },
+    { key:'tiny-lite', label:'Tiny Lite',     c1:'#3B82F6', c2:'#60A5FA', desc:'Fast and smart. GPT OSS 20B, great for everyday doubts.' },
+    { key:'llama-70b', label:'Llama 3.3 70B', c1:'#7C3AED', c2:'#C4B5FD', desc:'Meta Llama 70B. Balanced, natural replies.' },
+    { key:'llama-8b',  label:'Llama 3.1 8B',  c1:'#0EA5E9', c2:'#B9D9DC', desc:'Instant replies for quick, simple doubts.' },
+  ];
+  const getModel = k => MODELS.find(m => m.key === k) || MODELS[0];
+  let settings = Object.assign({ tone: 'friendly', type: 'balanced', model: 'tiny' }, LS.get('tsai_settings', {}));
+  if (!MODELS.some(m => m.key === settings.model)) settings.model = 'tiny';
   function updateSeg(id, key) {
     document.querySelectorAll('#' + id + ' button').forEach(b => b.classList.toggle('active', b.dataset.v === settings[key]));
   }
@@ -463,6 +512,42 @@
     document.querySelectorAll('#themeSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === root.getAttribute('data-theme')));
   }
   updateSeg('toneSeg', 'tone'); updateSeg('typeSeg', 'type'); updateThemeSeg();
+  updateSeg('modelSeg', 'model');
+  document.querySelectorAll('#modelSeg button').forEach(b => b.addEventListener('click', () => setModel(b.dataset.v)));
+
+  // ---------- model picker ----------
+  const modelChip = document.getElementById('modelChip');
+  const modelMenu = document.createElement('div');
+  modelMenu.className = 'model-menu'; modelMenu.setAttribute('role', 'listbox');
+  document.body.appendChild(modelMenu);
+  function renderModelUI() {
+    document.getElementById('modelChipName').textContent = getModel(settings.model).label;
+    updateSeg('modelSeg', 'model');
+    modelMenu.innerHTML = '<div class="model-menu-title">Choose AI model</div>' + MODELS.map(o => `
+      <div class="model-opt ${o.key === settings.model ? 'active' : ''}" role="option" data-k="${o.key}">
+        <div class="mo-icon" style="background:linear-gradient(135deg,${o.c1},${o.c2})"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" fill="#fff"/></svg></div>
+        <div class="mo-text"><div class="mo-name">${o.label}${o.badge ? '<span class="mo-badge">' + o.badge + '</span>' : ''}</div><div class="mo-desc">${o.desc}</div></div>
+        <svg class="mo-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>`).join('');
+  }
+  function setModel(key) {
+    settings.model = key; LS.set('tsai_settings', settings); renderModelUI(); closeModelMenu();
+  }
+  function closeModelMenu() { modelMenu.classList.remove('show'); modelChip.classList.remove('open'); }
+  modelChip.addEventListener('click', e => {
+    e.stopPropagation();
+    if (modelMenu.classList.contains('show')) { closeModelMenu(); return; }
+    modelChip.classList.add('open'); modelMenu.classList.add('show');
+    const r = modelChip.getBoundingClientRect(), h = modelMenu.offsetHeight, w = modelMenu.offsetWidth;
+    modelMenu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+    const below = r.bottom + 8 + h <= window.innerHeight;
+    modelMenu.style.top = (below ? r.bottom + 8 : Math.max(8, r.top - h - 8)) + 'px';
+  });
+  modelMenu.addEventListener('click', e => { const o = e.target.closest('.model-opt'); if (o) setModel(o.dataset.k); });
+  document.addEventListener('click', e => { if (!e.target.closest('.model-menu')) closeModelMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModelMenu(); });
+  window.addEventListener('resize', closeModelMenu);
+  renderModelUI();
   document.querySelectorAll('#toneSeg button').forEach(b => b.addEventListener('click', () => { settings.tone = b.dataset.v; LS.set('tsai_settings', settings); updateSeg('toneSeg', 'tone'); }));
   document.querySelectorAll('#typeSeg button').forEach(b => b.addEventListener('click', () => { settings.type = b.dataset.v; LS.set('tsai_settings', settings); updateSeg('typeSeg', 'type'); }));
   document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.v)));
@@ -577,7 +662,13 @@
       if (!res.ok) {
         addBubble('bot', 'Something went wrong: ' + (data.error || 'unknown error') + '. Try again.');
       } else {
-        addBubble('bot', data.reply);
+        const botBubble = addBubble('bot', data.reply);
+        if (data.fallback) {
+          const note = document.createElement('span');
+          note.className = 'model-note';
+          note.textContent = getModel(settings.model).label + ' was unavailable, so ' + data.label + ' answered.';
+          botBubble.appendChild(note);
+        }
         chatHistory.push({ role: 'assistant', content: data.reply });
         saveSession();
       }
@@ -667,7 +758,7 @@
     quizModal.innerHTML = '<h3>Loading today\'s quiz…</h3><p style="color:var(--muted);font-size:13px;">Generating 5 fresh questions.</p>';
     quizBackdrop.style.display = 'flex';
     try {
-      const res = await fetch('/api/quiz', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}) });
+      const res = await fetch('/api/quiz', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model: settings.model }) });
       const data = await res.json();
       if (!res.ok) { quizModal.innerHTML = '<h3>Could not load quiz</h3><p>' + escapeHtml(data.error || 'Try again shortly.') + '</p><button class="quiz-nav-btn" onclick="document.getElementById(\'quizBackdrop\').style.display=\'none\'">Close</button>'; return; }
       runQuiz(data.questions);

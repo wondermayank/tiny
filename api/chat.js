@@ -1,6 +1,7 @@
 // api/chat.js — Vercel serverless function
 // Calls Groq's OpenAI-compatible chat completions endpoint.
 // Requires env var GROQ_API_KEY set in the Vercel project settings.
+import { groqComplete } from './_groq.js';
 
 function buildSystemPrompt(profile, settings) {
   const name = (profile && profile.name && String(profile.name).slice(0, 40)) || 'there';
@@ -73,30 +74,17 @@ export default async function handler(req, res) {
 
     const systemPrompt = buildSystemPrompt(profile, settings);
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'system', content: systemPrompt }, ...trimmed],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
+    const out = await groqComplete({
+      apiKey,
+      preferred: settings && settings.model,
+      messages: [{ role: 'system', content: systemPrompt }, ...trimmed],
+      temperature: 0.7,
+      maxTokens: 500,
     });
+    const reply = out.reply || "I couldn't think of a reply — try again.";
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      return res.status(groqRes.status).json({ error: `Groq API error: ${errText}` });
-    }
-
-    const data = await groqRes.json();
-    const reply = data?.choices?.[0]?.message?.content?.trim() || "I couldn't think of a reply — try again.";
-
-    return res.status(200).json({ reply });
+    return res.status(200).json({ reply, model: out.key, label: out.label, fallback: out.fallback });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Unknown server error.' });
+    return res.status(err.status || 500).json({ error: err.message || 'Unknown server error.' });
   }
 }
