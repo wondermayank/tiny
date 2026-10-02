@@ -1,7 +1,12 @@
 // api/chat.js — Vercel serverless function
-// Calls Groq's OpenAI-compatible chat completions endpoint.
+// Calls Groq's OpenAI-compatible chat completions endpoint and streams the answer back to the
+// browser as newline-delimited JSON:
+//   {"type":"meta","model":...,"label":...,"fallback":bool}   (first line)
+//   {"type":"delta","text":"..."}                              (many)
+//   {"type":"done"} or {"type":"error","error":"..."}           (last line)
+// Errors that happen before streaming starts are a normal JSON error response.
 // Requires env var GROQ_API_KEY set in the Vercel project settings.
-import { groqComplete } from './_groq.js';
+import { groqOpenStream, readGroqStream } from './_groq.js';
 
 function buildSystemPrompt(profile, settings) {
   const name = (profile && profile.name && String(profile.name).slice(0, 40)) || 'there';
@@ -69,22 +74,44 @@ export default async function handler(req, res) {
 
     const trimmed = messages.slice(-14).map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: String(m.content || '').slice(0, 2000),
+      content: String(m.content || '').slice(0, 4000),
     }));
 
     const systemPrompt = buildSystemPrompt(profile, settings);
 
-    const out = await groqComplete({
+    const out = await groqOpenStream({
       apiKey,
       preferred: settings && settings.model,
       messages: [{ role: 'system', content: systemPrompt }, ...trimmed],
       temperature: 0.7,
       maxTokens: 500,
     });
-    const reply = out.reply || "I couldn't think of a reply — try again.";
 
-    return res.status(200).json({ reply, model: out.key, label: out.label, fallback: out.fallback });
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const send = (obj) => res.write(JSON.stringify(obj) + '\n');
+    send({ type: 'meta', model: out.key, label: out.label, fallback: out.fallback });
+
+    // Stop reading from Groq if the visitor closes the tab / hits stop.
+    const controller = new AbortController();
+    res.on('close', () => controller.abort());
+
+    try {
+      const full = await readGroqStream(out.body, (text) => send({ type: 'delta', text }), controller.signal);
+      if (!full.trim() && !controller.signal.aborted) {
+        send({ type: 'error', error: "I couldn't think of a reply — try again." });
+      } else {
+        send({ type: 'done' });
+      }
+    } catch (e) {
+      console.error('[chat] stream failed:', e && e.message);
+      send({ type: 'error', error: 'The reply was cut off. Please try again.' });
+    }
+    return res.end();
   } catch (err) {
+    if (res.headersSent) return res.end();
     return res.status(err.status || 500).json({ error: err.message || 'Unknown server error.' });
   }
 }

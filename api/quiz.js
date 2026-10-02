@@ -2,6 +2,35 @@
 // Requires env var GROQ_API_KEY.
 import { groqComplete } from './_groq.js';
 
+
+// Models sometimes wrap JSON in fences or add a sentence around it, so be forgiving.
+function parseJson(raw) {
+  const text = String(raw || '').trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const i = text.indexOf('{');
+    const j = text.lastIndexOf('}');
+    if (i >= 0 && j > i) {
+      try { return JSON.parse(text.slice(i, j + 1)); } catch { /* fall through */ }
+    }
+    return null;
+  }
+}
+
+// Returns a safe question object, or null if the model got the shape wrong.
+function cleanQuestion(q) {
+  if (!q || typeof q !== 'object') return null;
+  const question = typeof q.question === 'string' ? q.question.trim() : '';
+  if (!question || !Array.isArray(q.options) || q.options.length !== 4) return null;
+  const options = q.options.map((o) => (typeof o === 'string' || typeof o === 'number' ? String(o).trim() : ''));
+  if (options.some((o) => !o) || new Set(options).size !== 4) return null;
+  const answerIndex = Number(q.answerIndex);
+  if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex > 3) return null;
+  const explanation = typeof q.explanation === 'string' ? q.explanation.trim().slice(0, 300) : '';
+  return { question: question.slice(0, 500), options: options.map((o) => o.slice(0, 200)), answerIndex, explanation };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -34,19 +63,22 @@ Rules: 4 options per question, answerIndex is 0-based index of the correct optio
       maxTokens: 900,
       json: true,
     });
-    const raw = out.reply || '{}';
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return res.status(502).json({ error: 'Model returned invalid JSON.' });
+    const parsed = parseJson(out.reply);
+    if (!parsed) {
+      return res.status(502).json({ error: 'Model returned invalid JSON. Please try again.' });
     }
 
-    if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-      return res.status(502).json({ error: 'Model returned no questions.' });
+    const questions = (Array.isArray(parsed.questions) ? parsed.questions : [])
+      .map(cleanQuestion)
+      .filter(Boolean)
+      .slice(0, 5);
+
+    // A quiz with only one or two usable questions isn't worth showing — ask the student to retry.
+    if (questions.length < 3) {
+      return res.status(502).json({ error: 'The quiz came back incomplete. Please try again.' });
     }
 
-    return res.status(200).json({ questions: parsed.questions.slice(0, 5) });
+    return res.status(200).json({ questions });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message || 'Unknown server error.' });
   }
