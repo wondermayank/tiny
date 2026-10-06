@@ -8,7 +8,7 @@
 // Requires env var GROQ_API_KEY set in the Vercel project settings.
 import { groqOpenStream, readGroqStream } from './_groq.js';
 
-function buildSystemPrompt(profile, settings) {
+function buildSystemPrompt(profile, settings, detail) {
   const name = (profile && profile.name && String(profile.name).slice(0, 40)) || 'there';
   const gender = profile && profile.gender; // 'girl' | 'boy' | 'other' | undefined
   const tone = (settings && settings.tone) || 'friendly'; // 'friendly' | 'formal'
@@ -18,7 +18,9 @@ function buildSystemPrompt(profile, settings) {
     ? 'Speak in a polite, exam-coach register — clear and respectful, minimal slang.'
     : 'Speak like a supportive senior/friend — warm, encouraging, plain language, light and never robotic.';
 
-  const lengthLine = {
+  const lengthLine = detail
+    ? 'Give a complete, well-structured explanation: a one-line definition first, then clear headings or bullets, key terms, a simple example, and one quick exam tip at the end.'
+    : {
     short: 'Keep every answer to 2-4 sentences unless the student explicitly asks for more detail.',
     balanced: 'Keep answers focused — a short paragraph or a tight bulleted list. Expand only if asked.',
     detailed: 'Give thorough, well-structured answers with examples when useful.',
@@ -67,7 +69,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, profile, settings } = req.body || {};
+    const { messages, profile, settings, detail } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required.' });
     }
@@ -77,14 +79,14 @@ export default async function handler(req, res) {
       content: String(m.content || '').slice(0, 4000),
     }));
 
-    const systemPrompt = buildSystemPrompt(profile, settings);
+    const systemPrompt = buildSystemPrompt(profile, settings, detail === true);
 
     const out = await groqOpenStream({
       apiKey,
       preferred: settings && settings.model,
       messages: [{ role: 'system', content: systemPrompt }, ...trimmed],
       temperature: 0.7,
-      maxTokens: 500,
+      maxTokens: detail === true ? 1400 : 500,
     });
 
     res.status(200);

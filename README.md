@@ -14,13 +14,13 @@ browser via `localStorage` — nothing is sent to a database.
 - `api/quiz.js` — Groq call that returns up to 5 MCQs as JSON for the daily
   quiz widget. Every question is validated (4 distinct options, `answerIndex`
   0–3) before it reaches the browser.
-- `vendor/` — self-hosted `model-viewer`, Draco decoder and KaTeX (formulas).
+- `vendor/` — self-hosted KaTeX (formulas).
+- `images/stickers/` — the nine sticker poses (`tiny-smile`, `-wave`, `-hello`, `-idea`, `-explain`, `-cheer`, `-sleep`, `-excited`, `-cry`).
 
 ## Features implemented
 - **Onboarding** — first visit asks name + gender, stored locally, used to
   personalize tone (see "Gender-aware answers" below).
-- **Chat** — bubble UI, quick-action chips (Study Plan / Explain Topic / Ask
-  Doubt / Syllabus / Mock Test → opens your existing aimock app.html).
+- **Chat** — bubble UI with a bot avatar. The shortcuts live in the sidebar: Study Plan and Syllabus drop a starter sentence into the chat bar, Mock Test opens your aimock app.html, Daily 5-Question Quiz opens the quiz.
   Replies stream in as they are written and are shown as formatted Markdown
   (bold, lists, tables, code) with LaTeX formulas typeset by KaTeX — KaTeX is
   only downloaded the first time a reply contains a formula. The message box
@@ -30,8 +30,11 @@ browser via `localStorage` — nothing is sent to a database.
   on the device so it can't be re-rolled. Every answer is saved as it is
   given, so closing the quiz half way resumes where you stopped. The result is
   added to Saved automatically, once.
+- **New chat** — the "New chat" button at the top of the sidebar starts a fresh conversation. The old one stays in History. If a reply is still streaming, it is stopped and kept first.
+- **Stop** — while a reply streams, the send button turns into a Stop button. What had already arrived is kept (with a "Stopped" note) and saved to History.
+- **Copy and Save** — every reply has a Copy button (copies the reply's text, formulas as LaTeX) and a Save button. Saved answers go to the Saved tab (tap one to read it, copy it or remove it). Stored in `tsai_bookmarks` with `type: 'answer'`; up to 100 are kept, oldest dropped first. Replies reopened from History get the buttons too.
 - **History** — past chat sessions saved locally, click to reopen.
-- **Bookmarks** — saved quiz results (extend this the same way to save full
+- **Bookmarks** — saved chat answers and saved quiz results (extend this the same way to save full
   mock tests from `app.html` if you wire that page to write to the same
   `tsai_bookmarks` localStorage key).
 - **Study Tools** — Summarize Notes / Explain Simply / Doubt Solver, all
@@ -41,11 +44,9 @@ browser via `localStorage` — nothing is sent to a database.
 - **Profile** — edit name/gender any time.
 - **Settings** — tone (Friendly/Formal), answer length (Short/Balanced/
   Detailed), dark mode, and a "clear my data" button (keeps your theme).
-- **Phones (≤640px)** — the sidebar becomes a bottom tab bar, the character
-  becomes a small avatar in the header, the streak shows in the header and the
-  progress stats move to the Profile page.
-- **Stats bar** — streak, quizzes taken, accuracy, level — all computed
-  honestly from local data (no fake numbers).
+- **Phones (≤900px)** — the sidebar becomes a slide-in menu (hamburger button in the header). The chat bar, sticker and Model chip stay at the bottom, same as on desktop.
+- **Progress** — streak, quizzes taken, accuracy, level — shown on the Profile page, computed honestly from local data (no fake numbers). The quiz item in the sidebar shows today's progress.
+- **Chat bar** — the paperclip attaches a plain-text file (txt, md, csv, code; up to 400 KB, trimmed to the 4000-character limit). The mic uses the browser's speech recognition (Chrome/Edge/Safari; other browsers show a short message).
 
 ## Gender-aware answers
 Per your spec: if the profile is "girl" and she asks about periods, the
@@ -56,14 +57,20 @@ biology brief and spends more of the answer on how to be supportive
 (practical, respectful, non-awkward). This logic lives in
 `buildSystemPrompt()` in `api/chat.js` — edit the wording there any time.
 
-## 3D character
-The character on the right side is a 3D model (`images/character.glb`, ~0.5 MB — simplified to
-about 160k triangles and Draco-compressed), shown with Google's `<model-viewer>`. Everything is
-self-hosted (`vendor/model-viewer.min.js`, `vendor/draco/`), so it works without any CDN. The panel
-is hidden on screens under 900px wide, and the viewer script itself is only downloaded on wider
-screens. To swap the character, replace `images/character.glb`, then re-render the small images
-from it: `images/character.webp` (loading preview), `images/avatar.webp` (mobile header) and
-`images/og.jpg` (link-preview image).
+## Sticker
+The sticker sits above the chat bar, left of the Model chip. It shows a different pose for each moment:
+smile (idle), wave (greeting), hello (you are typing), idea (hover / tap), explain (the AI is answering), cheer (answer done),
+sleep (late night), excited (something good happened), cry (offline, or a sad moment).
+
+- **Sleep** — if the app is opened between 8 PM and 5 AM (the visitor's local time) the sticker starts asleep, and there is no wave greeting. Typing or hovering wakes her for a moment; sending the first message wakes her for good (until the page is reopened). Change the hours with `NIGHT_FROM` / `NIGHT_TO` in `index.html`.
+- **Cry** — shown while the browser is offline (it stays until the connection is back, with a toast when it returns), and for about five seconds when a chat or Study Tool answer fails, or when an answer is about something painful. An answer counts as painful if it has one strong word (tragedy, grief, suicide, abuse, "sorry to hear"...) or three different softer ones (death, war, loss, suffer...). Both word lists are `PAIN_STRONG` / `PAIN_SOFT` in `index.html`; edit them to taste. Painful answers show the crying pose instead of the usual cheer.
+- **Excited** — shown for about five seconds when something good happens: a daily-quiz score of 4/5 or better, a level-up, or a study-streak milestone (3, 7, 14, 21, 30, 50, 100 days; list is `STREAK_MILESTONES`). For the quiz it plays when the quiz window is closed. Call `goodNews()` from anywhere in the script to trigger it for a new event.
+
+- **Hover** (tap on phones) shows a "Did you know?" bubble with a short fact.
+- **Click** (or the "Explain it fully" button) asks that topic in the chat, e.g. "What is the periodic table?", and the full
+  answer streams into the chat. The topic list is `TOPICS` in `index.html`; add your own `{ fact, q }` pairs there.
+- These questions are sent with `detail: true`, so `api/chat.js` allows a longer, fully structured answer (1400 tokens instead of 500).
+- Poses are in `images/stickers/` (480×560 transparent WebP). To change one, replace the file with the same name. Only the top part of the picture shows above the chat bar, so keep the head near the top.
 
 ## AI models
 Pick a model from the chip above the chat box, or in Settings. Tiny is the default.
