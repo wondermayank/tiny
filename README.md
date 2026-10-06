@@ -15,7 +15,7 @@ browser via `localStorage` — nothing is sent to a database.
   quiz widget. Every question is validated (4 distinct options, `answerIndex`
   0–3) before it reaches the browser.
 - `vendor/` — self-hosted KaTeX (formulas).
-- `images/stickers/` — the ten sticker poses (`tiny-smile`, `-wave`, `-hello`, `-idea`, `-explain`, `-cheer`, `-sleep`, `-excited`, `-cry`, `-type`).
+- `images/stickers/` — the sticker poses (`tiny-smile`, `-wave`, `-hello`, `-idea`, `-explain`, `-cheer`, `-sleep`, `-excited`, `-cry`, `-type`) plus five quiz result poses (cut-out art, one per score band: 0-30 stressed, 30-50 sad, 50-70 unsure, 70-90 happy, 90-100 celebrating) (`tiny-score-0-30`, `-30-50`, `-50-70`, `-70-90`, `-90-100`).
 
 ## Features implemented
 - **Onboarding** — first visit asks name + gender, stored locally, used to
@@ -62,6 +62,8 @@ The sticker sits above the chat bar, left of the Model chip. It shows a differen
 smile (idle), type (laptop: you are typing, or Tiny is reading your attached file), idea (hover / tap), explain (the AI is answering),
 sleep (late night), excited (something good happened), cry (offline, or a sad moment), and wave / hello / cheer as answer reactions.
 
+- **Quiz reactions** — after every answer in the daily quiz, a right answer shows the excited pose and a wrong one the crying pose (in the quiz window next to "Correct!" / "Not quite", and on the main sticker behind it).
+- **Quiz result stickers** — the result screen shows a pose for the percentage of questions right: 0 to 29% `score-0-30` (stressed, failed paper), 30 to 49% `score-30-50` (sad), 50 to 69% `score-50-70` (unsure), 70 to 89% `score-70-90` (smiling), 90 to 100% `score-90-100` (the "100" paper). With 5 questions that is 0-1 right, 2, 3, 4, 5. The main sticker shows the same pose for about five seconds after the quiz window is closed. The bands and messages are `SCORE_BANDS` in `index.html`.
 - **Typing and files** — while the chat box has text in it the sticker works on her laptop. Attaching a text file shows the same pose while it is read, and again while Tiny answers a message built from that file (instead of the usual "explain" pose). This pose is shown taller than the others (`.sticker[data-pose="type"]` in the CSS) so the laptop and hands clear the chat bar.
 - **Answer reactions** — after each answer the sticker picks a pose from what was said (`answerPose()` in `index.html`, first match wins): painful → cry, a greeting → wave, praise or "that's right" → excited, rest and sleep advice → sleep, thanks → cheer, two or more tip words → idea, long or structured (lists, tables, code, formulas, over 900 characters) → explain, very short → smile, anything else → hello. Add your own rules there.
 

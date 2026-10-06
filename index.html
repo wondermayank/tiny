@@ -152,11 +152,36 @@
   .sticker { transition:height .18s ease; }
   .sticker[data-pose="type"] { height:calc(var(--stk-w) * .88); }   /* show the laptop and hands above the chat bar */
   .sticker:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:16px; }
-  .sticker img { display:block; width:100%; height:auto; pointer-events:none; filter:drop-shadow(0 6px 10px rgba(87,58,252,.18)); animation:bob 3.4s ease-in-out infinite; }
-  .sticker img.swap { animation:swap .28s ease-out, bob 3.4s ease-in-out .28s infinite; }
+  .sticker { position:relative; }
+  .stk-bob { position:relative; animation:bob 3.4s ease-in-out infinite; }
+  .stk-bob.asleep { animation:breathe 4.2s ease-in-out infinite; }   /* slow breathing while she sleeps */
+  .stk-motion { position:relative; transform-origin:50% 100%; }
+  .sticker img { display:block; width:100%; height:auto; pointer-events:none; filter:drop-shadow(0 6px 10px rgba(87,58,252,.18)); }
+  .sticker img.fade-in { animation:poseIn .35s ease-out both; }
+  .sticker img.ghost { position:absolute; left:0; top:0; animation:poseOut .35s ease-out both; }
   @keyframes bob { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
-  @keyframes swap { from{opacity:.2; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
-  @media (prefers-reduced-motion:reduce) { .sticker img, .sticker img.swap { animation:none; } }
+  @keyframes breathe { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(1px) scale(1.012);} }
+  @keyframes poseIn { from{opacity:0;} to{opacity:1;} }
+  @keyframes poseOut { from{opacity:1;} to{opacity:0;} }
+  /* excited = a few happy hops, cry = a gentle side-to-side tremble */
+  .stk-motion.m-bounce { animation:hop .9s cubic-bezier(.3,.7,.4,1); }
+  .stk-motion.m-shake { animation:tremble .7s ease-in-out; }
+  @keyframes hop { 0%{transform:translateY(0) scale(1,1);} 14%{transform:translateY(0) scale(1.05,.93);} 36%{transform:translateY(-16px) scale(.97,1.04);} 56%{transform:translateY(0) scale(1.04,.95);} 72%{transform:translateY(-8px) scale(.99,1.02);} 88%{transform:translateY(0) scale(1.02,.98);} 100%{transform:translateY(0) scale(1,1);} }
+  @keyframes tremble { 0%,100%{transform:translateX(0) rotate(0);} 12%{transform:translateX(-4px) rotate(-1.4deg);} 28%{transform:translateX(4px) rotate(1.4deg);} 44%{transform:translateX(-3px) rotate(-1deg);} 60%{transform:translateX(3px) rotate(1deg);} 76%{transform:translateX(-2px) rotate(-.5deg);} 90%{transform:translateX(1px) rotate(0);} }
+  /* floating Zzz while asleep */
+  .zzz { position:absolute; left:66%; top:26%; width:34%; height:60%; pointer-events:none; opacity:0; transition:opacity .3s; }
+  .sticker[data-pose="sleep"] .zzz { opacity:1; }
+  .zzz i { position:absolute; left:0; bottom:0; font-style:normal; font-weight:800; font-family:inherit; color:var(--primary); opacity:0; text-shadow:0 1px 0 var(--canvas),0 0 6px var(--canvas); animation:zFloat 3.6s ease-in infinite; }
+  .zzz i:nth-child(1) { font-size:13px; animation-delay:0s; }
+  .zzz i:nth-child(2) { font-size:17px; animation-delay:1.2s; }
+  .zzz i:nth-child(3) { font-size:22px; animation-delay:2.4s; }
+  @keyframes zFloat { 0%{transform:translate(0,0) rotate(-8deg) scale(.7); opacity:0;} 15%{opacity:.95;} 60%{opacity:.85;} 100%{transform:translate(14px,-62px) rotate(10deg) scale(1.15); opacity:0;} }
+  @media (prefers-reduced-motion:reduce) {
+    .stk-bob, .stk-bob.asleep, .stk-motion.m-bounce, .stk-motion.m-shake { animation:none; }
+    .sticker img.fade-in, .sticker img.ghost { animation-duration:.01s; }
+    .zzz i { animation:none; opacity:.9; }
+    .zzz i:nth-child(1) { transform:translate(0,-6px); } .zzz i:nth-child(2) { transform:translate(8px,-24px); } .zzz i:nth-child(3) { transform:translate(16px,-44px); }
+  }
 
   .fact-bubble { position:absolute; right:0; bottom:100%; width:min(280px,calc(100vw - 36px)); padding-bottom:12px; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .18s, transform .18s; }
   .sticker-wrap:hover .fact-bubble, .sticker-wrap:focus-within .fact-bubble, .sticker-wrap.show .fact-bubble { opacity:1; transform:none; pointer-events:auto; }
@@ -337,6 +362,21 @@
   .saved-body { display:none; padding:16px 18px 14px; border:1px solid var(--primary); border-top:none; border-radius:0 0 14px 14px; background:var(--canvas); font-size:14.5px; line-height:1.6; color:var(--body); }
   .saved-answer.open .saved-body { display:block; }
 
+  /* Quiz: quick reaction after each answer + result sticker */
+  .quiz-react { display:flex; align-items:center; gap:12px; margin:12px 0 4px; padding:8px 12px 8px 8px; border-radius:16px; background:var(--surface-soft); font-size:14px; }
+  .quiz-react img { width:64px; height:auto; flex-shrink:0; animation:reactPop .35s ease-out; }
+  .quiz-react.right img { animation:reactPop .35s ease-out, hop .9s cubic-bezier(.3,.7,.4,1) .3s; }
+  .quiz-react.wrong img { animation:reactPop .35s ease-out, tremble .7s ease-in-out .3s; }
+  .quiz-react.right { background:#dcfce7; color:#14532d; }
+  .quiz-react.wrong { background:#fee2e2; color:#7f1d1d; }
+  :root[data-theme="dark"] .quiz-react.right { background:rgba(34,197,94,.18); color:#bbf7d0; }
+  :root[data-theme="dark"] .quiz-react.wrong { background:rgba(220,38,38,.2); color:#fecaca; }
+  @keyframes reactPop { from { transform:scale(.6); opacity:0; } to { transform:scale(1); opacity:1; } }
+  .quiz-result-img { display:block; width:min(230px,70%); height:auto; margin:0 auto 6px; animation:reactPop .4s ease-out; }
+  .quiz-result-img.hop { animation:reactPop .4s ease-out, hop .9s cubic-bezier(.3,.7,.4,1) .4s; }
+  .quiz-result-img.tremble { animation:reactPop .4s ease-out, tremble .7s ease-in-out .4s; }
+  @media (prefers-reduced-motion:reduce) { .quiz-react img, .quiz-react.right img, .quiz-react.wrong img, .quiz-result-img, .quiz-result-img.hop, .quiz-result-img.tremble { animation:none; } }
+
   /* Toast */
   .toast { position:fixed; left:50%; bottom:28px; transform:translate(-50%,16px); background:var(--ink); color:var(--canvas); padding:10px 18px; border-radius:9999px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:1000; max-width:90vw; text-align:center; }
   .toast.show { opacity:1; transform:translate(-50%,0); }
@@ -421,7 +461,7 @@
                 </div>
               </div>
               <button class="sticker" id="sticker" type="button" aria-label="Ask a quick study question">
-                <img id="stickerImg" src="/images/stickers/tiny-smile.webp" alt="" width="480" height="560" decoding="async">
+                <span class="stk-bob" id="stkBob"><span class="stk-motion" id="stkMotion"><img id="stickerImg" src="/images/stickers/tiny-smile.webp" alt="" width="480" height="560" decoding="async"></span></span><span class="zzz" aria-hidden="true"><i>z</i><i>Z</i><i>Z</i></span>
               </button>
             </div>
             <button class="model-chip" id="modelChip" type="button" aria-haspopup="listbox" title="Choose AI model">
@@ -1129,6 +1169,7 @@
     readingFile = !!attachedName && text.indexOf('[' + attachedName + ']') !== -1;   // a message built from an attached file
     attachedName = null;
     sleepMode = false;          // the first message wakes the sticker for good
+    idleSleep = false; lastActive = Date.now();
     setBusyPose(true);
     const mySession = sessionId;
     addBubble('user', text);
@@ -1406,10 +1447,19 @@
   quizBackdrop.addEventListener('click', e => { if (e.target === quizBackdrop) closeQuiz(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && quizBackdrop.style.display !== 'none') closeQuiz(); });
 
-  let pendingGoodNews = false;   // a strong score or a level-up: the sticker celebrates once the quiz is closed
+  // Result stickers, one per score band (percent of questions right). First band whose upper limit is above the score wins.
+  const SCORE_BANDS = [
+    { max: 30,  key: '0-30',   msg: 'Tough one today. Mistakes are how you learn, so read the explanations and try again tomorrow.' },
+    { max: 50,  key: '30-50',  msg: 'You are getting there. Go over the ones you missed and come back stronger.' },
+    { max: 70,  key: '50-70',  msg: 'A decent start. A little more practice and you will be past 70.' },
+    { max: 90,  key: '70-90',  msg: 'Good work, that is a solid score.' },
+    { max: 101, key: '90-100', msg: 'Outstanding! Almost perfect.' },
+  ];
+  const scoreBand = (score, total) => { const pct = total ? score / total * 100 : 0; return SCORE_BANDS.find(b => pct < b.max); };
+  let pendingPose = null;   // result pose the main sticker shows once the quiz window is closed
   function closeQuiz() {
     quizBackdrop.style.display = 'none'; refreshQuizCard(); refreshStats();
-    if (pendingGoodNews) { pendingGoodNews = false; goodNews(5000); }
+    if (pendingPose) { const pz = pendingPose; pendingPose = null; flashPose(pz, 5500); }
   }
   function quizMessage(title, msg) {
     quizModal.innerHTML = '<h3>' + escapeHtml(title) + '</h3><p style="color:var(--muted);font-size:13.5px;">' + escapeHtml(msg) + '</p><button class="quiz-nav-btn" id="quizMsgClose">Close</button>';
@@ -1463,6 +1513,12 @@
         wrap.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
         if (idx === q.answerIndex) b.classList.add('correct');
         else { b.classList.add('incorrect'); wrap.children[q.answerIndex].classList.add('correct'); }
+        const right = idx === q.answerIndex;                    // quick reaction: right = excited, wrong = cry
+        if (right) goodNews(3000); else sadNews(3500);
+        const react = document.createElement('div');
+        react.className = 'quiz-react ' + (right ? 'right' : 'wrong');
+        react.innerHTML = '<img src="/images/stickers/tiny-' + (right ? 'excited' : 'cry') + '.webp" width="480" height="560" alt=""><b>' + (right ? 'Correct!' : 'Not quite. The right answer is marked above.') + '</b>';
+        wrap.appendChild(react);
         if (q.explanation) {
           const ex = document.createElement('p'); ex.className = 'quiz-explain'; ex.textContent = q.explanation;
           wrap.appendChild(ex);
@@ -1485,8 +1541,9 @@
     const levelBefore = levelOf(bm);
     bm.push({ type: 'quiz', title: 'Daily Quiz — ' + new Date().toLocaleDateString(), date: new Date().toISOString(), score: dailyScore(d), total: d.questions.length });
     LS.set('tsai_bookmarks', bm);
-    if (dailyScore(d) >= 4) pendingGoodNews = true;
-    if (levelOf(bm) > levelBefore) { pendingGoodNews = true; toast('Level up! You reached Level ' + levelOf(bm)); }
+    pendingPose = 'score-' + scoreBand(dailyScore(d), d.questions.length).key;
+    new Image().src = '/images/stickers/tiny-' + pendingPose + '.webp';
+    if (levelOf(bm) > levelBefore) toast('Level up! You reached Level ' + levelOf(bm));
     d.saved = true;
     LS.set(QUIZ_KEY, d);
     refreshStats();
@@ -1494,11 +1551,14 @@
 
   function showQuizResult(d) {
     const score = dailyScore(d), total = d.questions.length;
-    const msg = score >= 4 ? 'Nice work — that\'s a strong score.' : score >= 2 ? 'Good effort — come back tomorrow and beat it.' : 'Every quiz makes you sharper — see you tomorrow.';
-    quizModal.innerHTML = '<h3>Quiz complete</h3><p style="font-size:28px;font-weight:700;color:var(--primary);margin:6px 0;">' + score + '/' + total + '</p>' +
-      '<p style="color:var(--muted);font-size:13.5px;">' + msg + '</p>' +
-      '<p style="color:var(--muted);font-size:12.5px;">Saved to your Saved tab. A new quiz unlocks tomorrow.</p>' +
-      '<button class="quiz-nav-btn" id="closeQuizBtn">Close</button>';
+    const band = scoreBand(score, total), pct = Math.round(score / total * 100);
+    const resMotion = pct >= 70 ? ' hop' : (pct < 30 ? ' tremble' : '');
+    quizModal.innerHTML = '<img class="quiz-result-img' + resMotion + '" src="/images/stickers/tiny-score-' + band.key + '.webp" width="480" height="520" alt="">' +
+      '<h3 style="text-align:center;margin:0;">Quiz complete</h3>' +
+      '<p style="font-size:28px;font-weight:700;color:var(--primary);margin:6px 0;text-align:center;">' + score + '/' + total + ' <span style="font-size:15px;color:var(--muted);font-weight:600;">(' + pct + '%)</span></p>' +
+      '<p style="color:var(--muted);font-size:13.5px;text-align:center;">' + (pct === 100 ? 'Perfect score! You got every question right.' : band.msg) + '</p>' +
+      '<p style="color:var(--muted);font-size:12.5px;text-align:center;">Saved to your Saved tab. A new quiz unlocks tomorrow.</p>' +
+      '<div style="text-align:center;"><button class="quiz-nav-btn" id="closeQuizBtn">Close</button></div>';
     document.getElementById('closeQuizBtn').addEventListener('click', closeQuiz);
   }
 
@@ -1568,21 +1628,43 @@
   let attachedName = null, readingFile = false;   // a text file was attached / Tiny is answering about it
   let offline = navigator.onLine === false;   // no connection: she cries until it is back
   let sleepMode = (h => h >= NIGHT_FROM || h < NIGHT_TO)(new Date().getHours());
+  let idleSleep = false, lastActive = Date.now();   // idle nap: after IDLE_MS with no activity she dozes off, day or night
+  const IDLE_MS = 150000;                             // 2.5 minutes
   let curPose = offline ? 'cry' : (sleepMode ? 'sleep' : 'smile'), poseHold = null, hovering = false, stickerOpen = false;
   stickerBtn.dataset.pose = curPose;
   if (offline) stickerImg.src = '/images/stickers/tiny-cry.webp';
   else if (sleepMode) stickerImg.src = '/images/stickers/tiny-sleep.webp';
-  function showPose(p) {
-    if (p === curPose) return;
+  document.getElementById('stkBob').classList.toggle('asleep', curPose === 'sleep');
+  const stkBob = document.getElementById('stkBob'), stkMotion = document.getElementById('stkMotion');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const POSE_MOTION = { excited: 'm-bounce', cry: 'm-shake' };
+  function playMotion(p) {
+    stkMotion.classList.remove('m-bounce', 'm-shake');
+    const m = POSE_MOTION[p];
+    if (!m || reduceMotion.matches) return;
+    void stkMotion.offsetWidth; stkMotion.classList.add(m);
+  }
+  stkMotion.addEventListener('animationend', e => { if (e.target === stkMotion) stkMotion.classList.remove('m-bounce', 'm-shake'); });
+  // Cross-fade: the old picture stays on top as a "ghost" and fades out while the new one fades in underneath.
+  function showPose(p, replay) {
+    if (p === curPose) { if (replay) playMotion(p); return; }
+    const ghost = stickerImg.cloneNode(false);
+    ghost.removeAttribute('id'); ghost.className = 'ghost';
+    stkMotion.querySelectorAll('img.ghost').forEach(g => g.remove());
+    stkMotion.appendChild(ghost);
+    ghost.addEventListener('animationend', () => ghost.remove());
+    setTimeout(() => ghost.remove(), 600);
     curPose = p;
     stickerBtn.dataset.pose = p;
+    stkBob.classList.toggle('asleep', p === 'sleep');
     stickerImg.src = '/images/stickers/tiny-' + p + '.webp';
-    stickerImg.classList.remove('swap'); void stickerImg.offsetWidth; stickerImg.classList.add('swap');
+    stickerImg.classList.remove('fade-in'); void stickerImg.offsetWidth; stickerImg.classList.add('fade-in');
+    playMotion(p);
   }
   const attentionPose = () => (hovering || stickerOpen) ? 'idea' : null;
-  function restPose() { return offline ? 'cry' : busy ? (readingFile ? 'type' : 'explain') : (attentionPose() || (input.value.trim() ? 'type' : (sleepMode ? 'sleep' : 'smile'))); }
+  function restPose() { return offline ? 'cry' : busy ? (readingFile ? 'type' : 'explain') : (attentionPose() || (idleSleep ? 'sleep' : input.value.trim() ? 'type' : (sleepMode ? 'sleep' : 'smile'))); }
   function flashPose(p, ms) {
-    clearTimeout(poseHold); showPose(p);
+    clearTimeout(poseHold); showPose(p, true);
     poseHold = setTimeout(() => { poseHold = null; showPose(restPose()); }, ms);
   }
   function setBusyPose(b) {
@@ -1671,6 +1753,20 @@
     topicIdx = (topicIdx + 1) % TOPICS.length; paintTopic();
   }, 45000);
   input.addEventListener('input', () => { if (!poseHold && !busy) showPose(restPose()); });
+
+  // ---------- sleep when idle ----------
+  function wakeUp() {
+    lastActive = Date.now();
+    if (!idleSleep) return;
+    idleSleep = false;
+    if (!poseHold && !busy) showPose(restPose());
+  }
+  ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(ev => window.addEventListener(ev, wakeUp, { passive: true, capture: true }));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wakeUp(); });
+  setInterval(() => {
+    if (idleSleep || offline || busy || hovering || stickerOpen || poseHold || listening) { if (busy || poseHold || listening) lastActive = Date.now(); return; }
+    if (Date.now() - lastActive >= IDLE_MS) { idleSleep = true; showPose('sleep'); }
+  }, 5000);
   if (!checkStreakCheer() && !sleepMode && !offline) setTimeout(() => flashPose('wave', 3800), 700);   // no wave while she sleeps
 
   // ---------- attach a text file ----------
