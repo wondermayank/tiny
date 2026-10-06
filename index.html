@@ -149,6 +149,8 @@
   .dock > * { pointer-events:auto; }
   .sticker-wrap { position:relative; }
   .sticker { display:block; width:var(--stk-w); height:var(--stk-h); overflow:hidden; padding:0; border:none; background:none; cursor:pointer; -webkit-tap-highlight-color:transparent; border-radius:0; }
+  .sticker { transition:height .18s ease; }
+  .sticker[data-pose="type"] { height:calc(var(--stk-w) * .88); }   /* show the laptop and hands above the chat bar */
   .sticker:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:16px; }
   .sticker img { display:block; width:100%; height:auto; pointer-events:none; filter:drop-shadow(0 6px 10px rgba(87,58,252,.18)); animation:bob 3.4s ease-in-out infinite; }
   .sticker img.swap { animation:swap .28s ease-out, bob 3.4s ease-in-out .28s infinite; }
@@ -1124,6 +1126,8 @@
     if (!text || busy) return;
     const detail = !!(opts && opts.detail);
     busy = true;
+    readingFile = !!attachedName && text.indexOf('[' + attachedName + ']') !== -1;   // a message built from an attached file
+    attachedName = null;
     sleepMode = false;          // the first message wakes the sticker for good
     setBusyPose(true);
     const mySession = sessionId;
@@ -1158,7 +1162,7 @@
       renderInto(bubble._md, reply);
       if (meta && meta.fallback) addNote(bubble, getModel(settings.model).label + ' was unavailable, so ' + meta.label + ' answered.');
       if (sessionId === mySession) { chatHistory.push({ role: 'assistant', content: reply }); saveSession(); attachActions(bubble, reply, chatHistory.length - 1); }
-      if (isPainful(reply)) sadNews(5500); else celebrate();
+      { const pz = answerPose(text, reply); flashPose(pz, POSE_MS[pz] || 3500); }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     } catch (e) {
       cancelAnimationFrame(raf);
@@ -1188,7 +1192,7 @@
         sadNews();
       }
     } finally {
-      busy = false; currentAbort = null;
+      busy = false; currentAbort = null; readingFile = false;
       setSendMode(false);
       setBusyPose(false);
       if (!coarsePointer) input.focus();
@@ -1553,7 +1557,7 @@
     { fact: 'Past a black hole\u2019s event horizon, not even light can escape.', q: 'What is a black hole?' },
     { fact: 'Ancient Indian Sulba Sutras described the a\u00B2 + b\u00B2 = c\u00B2 rule long before it was called Pythagoras\u2019 theorem.', q: 'What is the Pythagoras theorem and how is it used?' },
   ];
-  const POSES = ['smile', 'wave', 'hello', 'idea', 'explain', 'cheer', 'sleep', 'excited', 'cry'];
+  const POSES = ['smile', 'wave', 'hello', 'idea', 'explain', 'cheer', 'sleep', 'excited', 'cry', 'type'];
   const NIGHT_FROM = 20, NIGHT_TO = 5;   // 8 PM to 5 AM: she is asleep until the first message
   const stickerWrap = document.getElementById('stickerWrap');
   const stickerBtn = document.getElementById('sticker');
@@ -1561,30 +1565,49 @@
   const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   window.addEventListener('load', () => POSES.forEach(p => { new Image().src = '/images/stickers/tiny-' + p + '.webp'; }));
 
+  let attachedName = null, readingFile = false;   // a text file was attached / Tiny is answering about it
   let offline = navigator.onLine === false;   // no connection: she cries until it is back
   let sleepMode = (h => h >= NIGHT_FROM || h < NIGHT_TO)(new Date().getHours());
   let curPose = offline ? 'cry' : (sleepMode ? 'sleep' : 'smile'), poseHold = null, hovering = false, stickerOpen = false;
+  stickerBtn.dataset.pose = curPose;
   if (offline) stickerImg.src = '/images/stickers/tiny-cry.webp';
   else if (sleepMode) stickerImg.src = '/images/stickers/tiny-sleep.webp';
   function showPose(p) {
     if (p === curPose) return;
     curPose = p;
+    stickerBtn.dataset.pose = p;
     stickerImg.src = '/images/stickers/tiny-' + p + '.webp';
     stickerImg.classList.remove('swap'); void stickerImg.offsetWidth; stickerImg.classList.add('swap');
   }
   const attentionPose = () => (hovering || stickerOpen) ? 'idea' : null;
-  function restPose() { return offline ? 'cry' : busy ? 'explain' : (attentionPose() || (input.value.trim() ? 'hello' : (sleepMode ? 'sleep' : 'smile'))); }
+  function restPose() { return offline ? 'cry' : busy ? (readingFile ? 'type' : 'explain') : (attentionPose() || (input.value.trim() ? 'type' : (sleepMode ? 'sleep' : 'smile'))); }
   function flashPose(p, ms) {
     clearTimeout(poseHold); showPose(p);
     poseHold = setTimeout(() => { poseHold = null; showPose(restPose()); }, ms);
   }
   function setBusyPose(b) {
-    if (b) { clearTimeout(poseHold); poseHold = null; showPose('explain'); }
+    if (b) { clearTimeout(poseHold); poseHold = null; showPose(restPose()); }
     else if (!poseHold) showPose(restPose());
   }
   function celebrate() { flashPose('cheer', 3500); }
   // Something good happened (strong quiz score, level-up, streak milestone): the excited pose.
   function goodNews(ms) { flashPose('excited', ms || 4500); }
+  // After an answer, Tiny reacts to what was said. First match wins; every pose gets used.
+  const POSE_MS = { cry: 5500, excited: 4500, sleep: 4500 };
+  const TIP_WORDS = /\b(tips?|tricks?|mnemonic|shortcut|hack|idea|ideas|suggest\w*|try this|remember (?:that|this)|did you know|fun fact)\b/gi;
+  function answerPose(q, a) {
+    q = String(q || ''); a = String(a || '');
+    if (isPainful(a)) return 'cry';
+    if (/^\s*(hi+|hello+|hey+|namaste|yo|good (morning|afternoon|evening))\b/i.test(a) || /^\s*(hi+|hello+|hey+|namaste|yo)\b[\s!.,?]*$/i.test(q)) return 'wave';
+    if (/\b(congratulations|congrats|well done|great job|you did it|proud of you|fantastic|awesome|excellent work|bravo|that(?:'|\u2019)s (?:correct|right)|you(?:'|\u2019)re (?:right|correct)|exactly right)\b/i.test(a)) return 'excited';
+    if (/\b(good night|sleep well|sweet dreams|bedtime|(?:get|getting) (?:enough|some|a good) (?:sleep|rest)|take a (?:nap|break|rest)|sleep (?:schedule|cycle|hygiene))\b/i.test(a)) return 'sleep';
+    if (/\b(thanks|thank you|thx|shukriya|dhanyavad)\b/i.test(q) || /\byou(?:'|\u2019)re welcome\b/i.test(a)) return 'cheer';
+    if (new Set((a.match(TIP_WORDS) || []).map(w => w.toLowerCase())).size >= 2 || /(?:^|\n)\W*(?:pro )?tip\b/i.test(a)) return 'idea';
+    const listItems = (a.match(/^\s*(?:[-*]|\d+[.)])\s/mg) || []).length;
+    if (a.length > 900 || listItems >= 4 || /^\s*\|.+\|/m.test(a) || /```/.test(a) || /\$\$|\\\(|\\\[/.test(a)) return 'explain';
+    if (a.length < 220) return 'smile';
+    return 'hello';
+  }
   // Sad moments: she cries when a question could not be answered, or when an answer is about something painful.
   function sadNews(ms) { flashPose('cry', ms || 5000); }
   // One strong word is enough; the softer words only count when several turn up in the same answer.
@@ -1658,6 +1681,7 @@
     fileInput.value = '';
     if (!f) return;
     if (f.size > 400000) { toast('That file is too big. Try one under 400 KB.'); return; }
+    flashPose('type', 2500);   // Tiny is reading the file
     const reader = new FileReader();
     reader.onerror = () => toast('Could not read that file');
     reader.onload = () => {
@@ -1667,6 +1691,7 @@
       const room = 4000 - head.length;
       if (room < 50) { toast('Your message is already full'); return; }
       input.value = head + txt.slice(0, room);
+      attachedName = f.name;
       autoGrow(); updateCount(); input.focus();
       if (txt.length > room) toast('File trimmed to fit the 4000 character limit');
     };
